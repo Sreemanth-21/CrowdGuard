@@ -50,18 +50,18 @@ CrowdGuard uses computer vision and machine learning to monitor crowd density, d
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    React Frontend                        │
+│                    React Frontend                       │
 │  Dashboard │ Alerts │ Analytics │ Settings │ Federated  │
 └──────────────────────┬──────────────────────────────────┘
                        │ REST API + WebSocket
 ┌──────────────────────▼──────────────────────────────────┐
-│                   FastAPI Backend                        │
+│                   FastAPI Backend                       │
 │  /api/video  /api/alerts  /api/analytics  /api/settings │
 │  /api/federated                           /ws           │
 └──────────────────────┬──────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────┐
-│                   ML Pipeline                            │
+│                   ML Pipeline                           │
 │  YOLOv8n → Centroid Tracker → Heatmap → Anomaly Engine  │
 │                           → Risk Scorer → Alert Manager │
 └──────────────────────┬──────────────────────────────────┘
