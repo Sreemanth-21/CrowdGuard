@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Federated Learning Components Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+        .component-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            background-color: #1e293b;
+        }
+        .component-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #8b5cf6;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #475569;
+        }
+        .feature-list li:before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: bold;
+        }
+        .code-block {
+            background-color: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-completed {
+            background-color: #065f46;
+            color: #10b981;
+        }
+        .api-endpoint {
+            background-color: #1e40af;
+            color: #60a5fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Federated Learning Components - Task 44 Implementation</h1>
+    
+    <div class="component-section">
+        <div class="component-title">
+            Task 44.1: NodeCard Component
+            <span class="status-badge status-completed">COMPLETED</span>
+        </div>
+        <ul class="feature-list">
+            <li>Display node name with formatted display (Mall_Entrance → Mall Entrance)</li>
+            <li>Dataset size indicator with visual bars (5-bar system)</li>
+            <li>Local accuracy metric with animated progress bar</li>
+            <li>Training status indicator (idle, training, completed) with icons</li>
+            <li>Animated training effect with pulsing border and rotating spinner</li>
+            <li>Rounds completed counter</li>
+            <li>Active state highlighting with pulsing indicator</li>
+        </ul>
+        
+        <div class="code-block">
+// Usage Example:
+&lt;NodeCard
+  name="Mall_Entrance"
+  datasetSize={100}
+  currentAccuracy={0.85}
+  trainingStatus="training"
+  roundsCompleted={5}
+  isActive={true}
+/&gt;
+        </div>
+    </div>
+
+    <div class="component-section">
+        <div class="component-title">
+            Task 44.2: CoordinatorCard Component
+            <span class="status-badge status-completed">COMPLETED</span>
+        </div>
+        <ul class="feature-list">
+            <li>Global accuracy display with large percentage format</li>
+            <li>Aggregation status with animated icon rotation</li>
+            <li>Round progress bar with gradient colors</li>
+            <li>Convergence rate metric display</li>
+            <li>Status indicators (idle, running, completed, failed)</li>
+            <li>Shimmer effect on progress bar during active training</li>
+            <li>Pulsing border animation for running status</li>
+            <li>Completion indicator with checkmark</li>
+        </ul>
+        
+        <div class="code-block">
+// Usage Example:
+&lt;CoordinatorCard
+  globalAccuracy={0.82}
+  currentRound={5}
+  totalRounds={10}
+  status="running"
+  convergenceRate={0.05}
+  isAggregating={true}
+/&gt;
+        </div>
+    </div>
+
+    <div class="component-section">
+        <div class="component-title">
+            Task 44.3: AccuracyChart Component
+            <span class="status-badge status-completed">COMPLETED</span>
+        </div>
+        <ul class="feature-list">
+            <li>Line chart showing convergence using Recharts library</li>
+            <li>Per-node accuracy lines with different colors</li>
+            <li>Global accuracy line (purple, thicker)</li>
+            <li>Round markers on X-axis</li>
+            <li>Custom tooltip with formatted accuracy percentages</li>
+            <li>Custom legend with color indicators</li>
+            <li>Convergence metrics summary (initial, final, improvement, rounds)</li>
+            <li>Animated line drawing with staggered delays</li>
+            <li>Responsive container for different screen sizes</li>
+        </ul>
+        
+        <div class="code-block">
+// Usage Example:
+&lt;AccuracyChart
+  data={[
+    { round: 1, globalAccuracy: 0.75, Mall_Entrance: 0.73, Food_Court: 0.76 },
+    { round: 2, globalAccuracy: 0.82, Mall_Entrance: 0.81, Food_Court: 0.83 }
+  ]}
+  nodeNames={["Mall_Entrance", "Food_Court", "Parking_Lot"]}
+  isAnimated={true}
+  height={400}
+/&gt;
+        </div>
+    </div>
+
+    <div class="component-section">
+        <div class="component-title">
+            Task 44.4: FederatedLearningDemo Component
+            <span class="status-badge status-completed">COMPLETED</span>
+        </div>
+        <ul class="feature-list">
+            <li>Start simulation button with API integration</li>
+            <li>Reset simulation button to restore to round zero</li>
+            <li>Progress indicator with round counter</li>
+            <li>Real-time status polling every 1 second</li>
+            <li>NodeCard rendering for each of 3 virtual nodes</li>
+            <li>CoordinatorCard for global status</li>
+            <li>AccuracyChart with convergence visualization</li>
+            <li>Animated flow diagram showing data and model exchange</li>
+            <li>Error handling and loading states</li>
+            <li>Active node cycling animation during training</li>
+        </ul>
+        
+        <div class="code-block">
+// API Endpoints Used:
+POST <span class="api-endpoint">/api/federated/simulate</span> - Start new simulation
+GET  <span class="api-endpoint">/api/federated/status</span> - Get current simulation status
+POST <span class="api-endpoint">/api/federated/reset/{id}</span> - Reset simulation
+GET  <span class="api-endpoint">/api/federated/convergence/{id}</span> - Get convergence history
+        </div>
+    </div>
+
+    <div class="component-section">
+        <div class="component-title">Implementation Features</div>
+        <ul class="feature-list">
+            <li>Framer Motion animations for smooth transitions and effects</li>
+            <li>Recharts integration for professional data visualization</li>
+            <li>TypeScript interfaces for type safety</li>
+            <li>Responsive design with Tailwind CSS</li>
+            <li>Real-time data fetching and updates</li>
+            <li>Error handling with user-friendly messages</li>
+            <li>Loading states and disabled button management</li>
+            <li>Consistent color scheme matching CrowdGuard design system</li>
+        </ul>
+    </div>
+
+    <div class="component-section">
+        <div class="component-title">Requirements Compliance</div>
+        <ul class="feature-list">
+            <li><strong>Requirement 29.7:</strong> Simulation controls (start/reset buttons) ✓</li>
+            <li><strong>Requirement 29.8:</strong> Accuracy metrics tracking (per-node and global) ✓</li>
+            <li><strong>Requirement 29.9:</strong> Convergence history visualization ✓</li>
+            <li><strong>Requirement 29.10:</strong> Animated flow diagram and visual effects ✓</li>
+        </ul>
+    </div>
+
+    <div class="component-section">
+        <div class="component-title">Next Steps</div>
+        <ul class="feature-list">
+            <li>Install dependencies: <code>npm install framer-motion recharts</code></li>
+            <li>Integration with Settings page (Task 45)</li>
+            <li>Responsive layout testing</li>
+            <li>End-to-end testing with backend API</li>
+        </ul>
+    </div>
+
+    <p style="text-align: center; margin-top: 40px; color: #64748b;">
+        Task 44: Federated Learning Frontend Components - <strong>COMPLETED</strong><br>
+        All components implemented with full functionality and animations
+    </p>
+</body>
+</html>

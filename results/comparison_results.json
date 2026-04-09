@@ -1,0 +1,31 @@
+{
+  "models": [
+    {
+      "label": "Model A: Pretrained YOLOv8n (baseline)",
+      "map50": 0.030635079696549987,
+      "map50_95": 0.013957425225863053,
+      "precision": 0.06380282541706928,
+      "recall": 0.04861963288969353,
+      "f1": 0.05518594715382658
+    },
+    {
+      "label": "Model B: Fine-tuned YOLOv8n (standard NMS)",
+      "map50": 0.2849212197152682,
+      "map50_95": 0.16254279550940542,
+      "precision": 0.3863063866482264,
+      "recall": 0.29261478993670553,
+      "f1": 0.33299583489907425
+    },
+    {
+      "label": "Model C: Fine-tuned YOLOv8n + Soft-NMS",
+      "map50": 0.29057034313917096,
+      "map50_95": 0.16166718320492243,
+      "precision": 0.4006373240513585,
+      "recall": 0.3000412231050529,
+      "f1": 0.34311800481458793,
+      "note": "Soft-NMS approximated via iou=0.3 during val; runtime uses ImprovedDetector with Gaussian Soft-NMS."
+    }
+  ],
+  "best_map50": 0.29057034313917096,
+  "best_model": "Model C: Fine-tuned YOLOv8n + Soft-NMS"
+}

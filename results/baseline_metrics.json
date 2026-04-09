@@ -1,0 +1,10 @@
+{
+  "model": "pretrained_yolov8n",
+  "weights": "yolov8n.pt",
+  "dataset": "VisDrone2019-DET-val",
+  "map50": 0.030673182063539882,
+  "map50_95": 0.013976007992772665,
+  "precision": 0.06378550309668639,
+  "recall": 0.04879977089843051,
+  "f1": 0.05529529395197431
+}

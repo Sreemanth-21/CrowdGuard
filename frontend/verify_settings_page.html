@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings Page Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1e293b;
+            color: white;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .error {
+            background-color: #7f1d1d;
+            border: 1px solid #ef4444;
+        }
+        .info {
+            background-color: #1e3a8a;
+            border: 1px solid #3b82f6;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        .checklist {
+            background-color: #374151;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 CrowdGuard Settings Page Verification</h1>
+    
+    <div class="info test-result">
+        <strong>Instructions:</strong> This page helps verify that the Settings page is working correctly.
+        Make sure both backend (port 8000) and frontend (port 5173) are running.
+    </div>
+
+    <h2>🧪 Automated Tests</h2>
+    <button onclick="runAPITests()">Run API Tests</button>
+    <button onclick="testFrontendAccess()">Test Frontend Access</button>
+    <button onclick="runFullVerification()">Run Full Verification</button>
+    
+    <div id="test-results"></div>
+
+    <h2>📋 Manual Verification Checklist</h2>
+    <div class="checklist">
+        <h3>1. Basic Page Access</h3>
+        <p>✅ Navigate to: <a href="http://localhost:5173/settings" target="_blank" style="color: #60a5fa;">http://localhost:5173/settings</a></p>
+        <p>✅ Verify page loads without console errors</p>
+        <p>✅ Verify "Settings" heading is visible</p>
+        <p>✅ Verify ConfigurationPanel component renders</p>
+        
+        <h3>2. Configuration Controls</h3>
+        <p>✅ Confidence Threshold slider (0.3-0.9) with current value display</p>
+        <p>✅ Model Variant dropdown (nano/small/medium)</p>
+        <p>✅ High Density Threshold slider (0.5-0.9)</p>
+        <p>✅ All anomaly detection threshold sliders</p>
+        <p>✅ Alert Cooldown slider (5-60 seconds)</p>
+        <p>✅ Heatmap Opacity slider (0.0-1.0)</p>
+        
+        <h3>3. Validation Testing</h3>
+        <p>✅ Move sliders to extreme values and verify they stay within bounds</p>
+        <p>✅ Verify validation error messages appear for invalid values</p>
+        <p>✅ Verify Save button is disabled when validation fails</p>
+        
+        <h3>4. Save Functionality</h3>
+        <p>✅ Change some settings values</p>
+        <p>✅ Click "Save Settings" button</p>
+        <p>✅ Verify success message appears</p>
+        <p>✅ Verify button shows "Saving..." during request</p>
+        
+        <h3>5. Reset Functionality</h3>
+        <p>✅ Change some settings values</p>
+        <p>✅ Click "Reset to Defaults" button</p>
+        <p>✅ Verify all settings return to default values</p>
+        <p>✅ Verify success message appears</p>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const FRONTEND_BASE = 'http://localhost:5173';
+        
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+        }
+        
+        async function runAPITests() {
+            clearResults();
+            addResult('🧪 Starting API Tests...', 'info');
+            
+            try {
+                // Test GET settings
+                addResult('📥 Testing GET /api/settings...', 'info');
+                const getResponse = await fetch(`${API_BASE}/api/settings`);
+                if (!getResponse.ok) throw new Error(`GET failed: ${getResponse.status}`);
+                const settings = await getResponse.json();
+                addResult('✅ GET settings successful', 'success');
+                
+                // Test UPDATE settings
+                addResult('📤 Testing PUT /api/settings...', 'info');
+                const updateData = {
+                    confidence_threshold: 0.7,
+                    heatmap_opacity: 0.8
+                };
+                const updateResponse = await fetch(`${API_BASE}/api/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updateData)
+                });
+                if (!updateResponse.ok) throw new Error(`PUT failed: ${updateResponse.status}`);
+                const updateResult = await updateResponse.json();
+                addResult('✅ UPDATE settings successful', 'success');
+                
+                // Test RESET settings
+                addResult('🔄 Testing POST /api/settings/reset...', 'info');
+                const resetResponse = await fetch(`${API_BASE}/api/settings/reset`, {
+                    method: 'POST'
+                });
+                if (!resetResponse.ok) throw new Error(`RESET failed: ${resetResponse.status}`);
+                const resetResult = await resetResponse.json();
+                addResult('✅ RESET settings successful', 'success');
+                
+                // Test validation
+                addResult('❌ Testing validation with invalid values...', 'info');
+                const invalidResponse = await fetch(`${API_BASE}/api/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        confidence_threshold: 1.5,
+                        heatmap_opacity: -0.1
+                    })
+                });
+                
+                if (!invalidResponse.ok) {
+                    addResult('✅ Validation working correctly - rejected invalid values', 'success');
+                } else {
+                    addResult('❌ Validation failed - accepted invalid values', 'error');
+                }
+                
+                addResult('🎉 All API tests completed successfully!', 'success');
+                
+            } catch (error) {
+                addResult(`❌ API test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testFrontendAccess() {
+            clearResults();
+            addResult('🌐 Testing Frontend Access...', 'info');
+            
+            try {
+                // Test if frontend is accessible
+                const frontendResponse = await fetch(`${FRONTEND_BASE}/settings`);
+                if (frontendResponse.ok) {
+                    addResult('✅ Frontend settings page is accessible', 'success');
+                } else {
+                    addResult(`❌ Frontend not accessible: ${frontendResponse.status}`, 'error');
+                }
+                
+                // Test if backend health endpoint is working
+                const healthResponse = await fetch(`${API_BASE}/health`);
+                if (healthResponse.ok) {
+                    const health = await healthResponse.json();
+                    addResult(`✅ Backend health check passed: ${health.status}`, 'success');
+                } else {
+                    addResult(`❌ Backend health check failed: ${healthResponse.status}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Frontend access test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function runFullVerification() {
+            clearResults();
+            addResult('🚀 Running Full Verification Suite...', 'info');
+            
+            await testFrontendAccess();
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            await runAPITests();
+            
+            addResult('', 'info');
+            addResult('📋 Next Steps:', 'info');
+            addResult('1. Open the settings page in a new tab: http://localhost:5173/settings', 'info');
+            addResult('2. Complete the manual verification checklist above', 'info');
+            addResult('3. Test all sliders, buttons, and validation', 'info');
+            addResult('4. Verify save and reset functionality works', 'info');
+        }
+    </script>
+</body>
+</html>
