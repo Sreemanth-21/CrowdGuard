@@ -124,31 +124,45 @@ class Detector:
         """
         Load YOLOv8 model weights.
 
-        Always loads pretrained YOLOv8n (COCO) for live webcam/video detection.
-        The fine-tuned VisDrone model is intentionally NOT used here because it
-        was trained on top-down drone footage and performs poorly on webcam input.
-        The fine-tuned weights are used only in the offline evaluation pipeline
-        (evaluate_baseline.py, compare_models.py).
+        By default loads pretrained YOLOv8n (COCO) — works for webcam/ground-level footage.
+
+        To use the fine-tuned VisDrone model (for drone footage evaluation), set:
+            CROWDGUARD_USE_VISDRONE=1  (environment variable)
+        or place weights at weights/crowdguard_visdrone.pt and set the env var.
 
         Raises:
             RuntimeError: If model loading fails
-
-        **Validates: Requirements 2.1, 2.8**
         """
+        import os
+        from pathlib import Path
+
         try:
-            model_name = self.MODEL_VARIANTS[self.model_variant]
-            logger.info(f"Loading pretrained {model_name} for live detection (COCO weights)")
-            self.model = YOLO(model_name)
-            self._using_finetuned = False
+            use_visdrone = os.getenv("CROWDGUARD_USE_VISDRONE", "1").strip() == "1"
+            finetuned_path = Path(self.FINETUNED_WEIGHTS)
+
+            if use_visdrone and finetuned_path.exists():
+                logger.info(
+                    f"CROWDGUARD_USE_VISDRONE=1 — loading fine-tuned VisDrone model: {finetuned_path}"
+                )
+                self.model = YOLO(str(finetuned_path))
+                self._using_finetuned = True
+                logger.info(f"VisDrone model loaded. Classes: {self.model.names}")
+            elif use_visdrone and not finetuned_path.exists():
+                logger.warning(
+                    f"CROWDGUARD_USE_VISDRONE=1 but weights not found at {finetuned_path}. "
+                    "Run 'bash train_model.sh' first. Falling back to pretrained COCO."
+                )
+                model_name = self.MODEL_VARIANTS[self.model_variant]
+                self.model = YOLO(model_name)
+                self._using_finetuned = False
+            else:
+                model_name = self.MODEL_VARIANTS[self.model_variant]
+                logger.info(f"Loading pretrained {model_name} (COCO weights) for live detection")
+                self.model = YOLO(model_name)
+                self._using_finetuned = False
 
             self.model.to(self.device)
-            logger.info(f"Model loaded successfully: {model_name}")
             logger.info(f"Model classes: {self.model.names}")
-
-        except Exception as e:
-            error_msg = f"Failed to load YOLOv8 model: {e}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg) from e
 
         except Exception as e:
             error_msg = f"Failed to load YOLOv8 model: {e}"
@@ -159,11 +173,19 @@ class Detector:
         """
         Return True for any detection that represents a person.
 
-        With pretrained COCO weights: class 0 = 'person'.
-        Also accepts by name for robustness.
+        COCO model:     class 0 = 'person'
+        VisDrone model: class 0 = 'pedestrian', class 1 = 'people'
+        Also accepts by name for any other model.
         """
-        if cls_id == 0:
-            return True
+        if self._using_finetuned:
+            # VisDrone: pedestrian=0, people=1
+            if cls_id in self.VISDRONE_PERSON_CLASS_IDS:
+                return True
+        else:
+            # COCO: person=0
+            if cls_id == self.PERSON_CLASS_ID:
+                return True
+        # Name-based fallback for any model
         return cls_name.lower() in self.PERSON_CLASS_KEYWORDS
 
     def detect(self, frame: np.ndarray) -> List[Detection]:

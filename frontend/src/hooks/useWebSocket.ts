@@ -110,6 +110,10 @@ export function useWebSocket() {
               console.log('[WS] Status:', data);
               break;
 
+            case 'ping':
+              // keepalive from server — no action needed
+              break;
+
             case 'error':
               console.error('[WS] Server error:', data);
               setWsError(data.message ?? msg.message ?? 'Server error');

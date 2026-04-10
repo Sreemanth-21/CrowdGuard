@@ -56,12 +56,18 @@ function Dashboard() {
     }
   };
 
+  const [isStopping, setIsStopping] = useState(false);
+
   const handleStopSession = async () => {
+    if (isStopping) return; // prevent double-fire
+    setIsStopping(true);
     setError(null);
     try {
       await stopSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop session');
+    } finally {
+      setIsStopping(false);
     }
   };
 
@@ -127,9 +133,10 @@ function Dashboard() {
                 ) : (
                   <button
                     onClick={handleStopSession}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium transition-colors"
+                    disabled={isStopping}
+                    className="bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white px-4 py-2 rounded font-medium transition-colors"
                   >
-                    Stop Session
+                    {isStopping ? 'Stopping...' : 'Stop Session'}
                   </button>
                 )}
               </div>

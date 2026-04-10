@@ -158,16 +158,28 @@ class VideoProcessor:
                 # Video file source
                 self.video_capture = cv2.VideoCapture(source_name)
                 logger.info(f"Opening video file: {source_name}")
-                
+
             else:
                 logger.error(f"Unsupported source type: {source_type}")
                 return False
-            
+
             # Verify video capture opened successfully
             if not self.video_capture.isOpened():
                 logger.error(f"Failed to open video source: {source_name}")
                 self.video_capture = None
                 return False
+
+            # Log video file metadata
+            if source_type == "upload":
+                total_frames = int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+                fps = self.video_capture.get(cv2.CAP_PROP_FPS)
+                width  = int(self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                logger.info(
+                    f"Video file opened: {source_name}, "
+                    f"frames={total_frames}, fps={fps:.1f}, "
+                    f"resolution={width}x{height}"
+                )
             
             # Set session state
             self.source_type = source_type

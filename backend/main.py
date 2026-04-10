@@ -69,8 +69,16 @@ app = FastAPI(
     title="CrowdGuard API",
     description="AI-powered crowd anomaly detection system",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
+# No body size limit — video uploads can be up to 500 MB
+# Uvicorn default is unlimited; this makes it explicit
+try:
+    from starlette.middleware.base import BaseHTTPMiddleware
+    # No size-limiting middleware added — intentional
+except ImportError:
+    pass
 
 # Configure CORS
 app.add_middleware(

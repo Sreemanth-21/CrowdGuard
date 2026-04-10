@@ -165,6 +165,7 @@ async def _frame_processing_loop(session_id: str):
     MAX_CONSECUTIVE_FAILURES = 30
     total_persons_seen = 0
     total_alerts_seen = 0
+    is_file_source = False
 
     try:
         while video_processor.is_active:
@@ -175,6 +176,11 @@ async def _frame_processing_loop(session_id: str):
                 )
 
                 if processed_frame is None:
+                    # For video files, None at this point means EOF — stop cleanly
+                    if video_processor.source_type == "upload":
+                        logger.info(f"[{session_id}] Video file reached end — stopping session cleanly")
+                        break
+                    # For webcam, count consecutive failures
                     consecutive_failures += 1
                     if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                         logger.warning(
@@ -269,6 +275,16 @@ async def _frame_processing_loop(session_id: str):
     except Exception as e:
         logger.error(f"[{session_id}] Frame processing loop fatal error: {e}", exc_info=True)
     finally:
+        # If video file ended naturally, stop the processor and close the DB session
+        if video_processor.is_active:
+            await asyncio.get_event_loop().run_in_executor(None, video_processor.stop_session)
+        try:
+            active = session_manager.get_active_session()
+            if active and active["session_id"] == session_id:
+                session_manager.end_session(session_id)
+                logger.info(f"[{session_id}] Session closed in DB after loop exit")
+        except Exception as cleanup_err:
+            logger.warning(f"[{session_id}] Session cleanup error: {cleanup_err}")
         db.close()
         logger.info(f"Frame processing loop ended for session {session_id}")
 
@@ -277,92 +293,67 @@ async def _frame_processing_loop(session_id: str):
 
 @router.post("/upload", response_model=VideoUploadResponse, status_code=status.HTTP_200_OK)
 async def upload_video(file: UploadFile = File(...)) -> VideoUploadResponse:
-    """
-    Upload a video file for processing.
-    
-    Accepts multipart/form-data with a file field.
-    Validates format and size before saving.
-    
-    Args:
-        file: Video file to upload
-        
-    Returns:
-        VideoUploadResponse with file metadata
-        
-    Raises:
-        HTTPException 400: Invalid format or size
-        HTTPException 500: Upload failed
-    """
+    """Upload a video file. Streams to disk to avoid memory/timeout issues."""
+    filepath = None
     try:
-        # Validate filename exists
         if not file.filename:
-            logger.error("Upload rejected: No filename provided")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "No filename provided"}
-            )
-        
-        logger.info(f"Upload request: filename={file.filename}, content_type={file.content_type}")
-        
-        # Validate video format
+            raise HTTPException(status_code=400, detail={"error": "No filename provided"})
+
+        logger.info(f"Video upload received: {file.filename}, content_type={file.content_type}")
+
         if not validate_video_format(file.filename):
-            logger.warning(f"Upload rejected: Unsupported format for {file.filename}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Unsupported video format", "supported_formats": list(ALLOWED_FORMATS)}
+                status_code=400,
+                detail={"error": "Unsupported video format", "supported_formats": list(ALLOWED_FORMATS)},
             )
 
-        # Read file content
-        content = await file.read()
-        file_size = len(content)
-        
-        logger.info(f"File read: {file.filename}, size={file_size} bytes")
+        # Use a unique filename to avoid collisions
+        import uuid as _uuid
+        ext = os.path.splitext(file.filename)[1].lower()
+        unique_name = f"{os.path.splitext(file.filename)[0]}_{_uuid.uuid4().hex[:8]}{ext}"
+        filepath = os.path.join(UPLOAD_DIR, unique_name)
 
-        # Validate file size
-        if file_size > MAX_FILE_SIZE:
-            logger.warning(f"Upload rejected: File size {file_size} exceeds limit {MAX_FILE_SIZE}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": f"File size exceeds {MAX_FILE_SIZE // (1024*1024)}MB limit"}
-            )
+        # Stream to disk in 1 MB chunks — avoids loading entire file into RAM
+        # and prevents proxy timeouts on large files
+        file_size = 0
+        chunk_size = 1024 * 1024  # 1 MB
+        with open(filepath, "wb") as out:
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                if file_size + len(chunk) > MAX_FILE_SIZE:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error": f"File size exceeds {MAX_FILE_SIZE // (1024*1024)}MB limit"},
+                    )
+                out.write(chunk)
+                file_size += len(chunk)
 
-        # Save file
-        filepath = os.path.join(UPLOAD_DIR, file.filename)
-        with open(filepath, "wb") as f:
-            f.write(content)
-        
-        logger.info(f"File saved: {filepath}")
-        
-        # Extract metadata
+        logger.info(f"Video saved to: {filepath}, size={file_size} bytes")
+
         metadata = get_video_metadata(filepath)
-        
-        logger.info(f"Upload successful: {file.filename}, duration={metadata['duration']}, resolution={metadata['resolution']}")
-        
+        logger.info(
+            f"Upload successful: {unique_name}, "
+            f"duration={metadata['duration']}, resolution={metadata['resolution']}"
+        )
+
         return VideoUploadResponse(
-            filename=file.filename,
+            filename=unique_name,
             size=file_size,
             duration=metadata["duration"],
-            resolution=metadata["resolution"]
+            resolution=metadata["resolution"],
         )
-        
+
     except HTTPException:
+        if filepath and os.path.exists(filepath):
+            os.remove(filepath)
         raise
     except Exception as e:
         logger.error(f"Upload error: {e}", exc_info=True)
-        # Clean up file if it was partially saved
-        if 'filepath' in locals() and os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-                logger.info(f"Cleaned up partial file: {filepath}")
-            except:
-                pass
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": f"Upload failed: {str(e)}"}
-        )
-        if os.path.exists(filepath):
+        if filepath and os.path.exists(filepath):
             os.remove(filepath)
-        raise HTTPException(status_code=500, detail={"error": "Failed to save uploaded file"})
+        raise HTTPException(status_code=500, detail={"error": f"Upload failed: {str(e)}"})
 
 
 @router.post("/start", response_model=VideoStartResponse, status_code=status.HTTP_200_OK)
@@ -390,46 +381,62 @@ async def start_session(
 
     # If a session is already active, stop it first so the new one can start cleanly
     active_session = session_manager.get_active_session()
-    if active_session:
-        old_id = active_session["session_id"]
-        logger.warning(
-            f"Session {old_id} already active — auto-stopping before starting new session"
-        )
+    if active_session or video_processor.is_active:
+        old_id = active_session["session_id"] if active_session else "unknown"
+        logger.warning(f"Session {old_id} already active — auto-stopping before starting new session")
         try:
             if video_processor.is_active:
-                await asyncio.get_event_loop().run_in_executor(
-                    None, video_processor.stop_session
-                )
-            session_manager.end_session(old_id)
+                await asyncio.get_event_loop().run_in_executor(None, video_processor.stop_session)
+            if active_session:
+                session_manager.end_session(old_id)
             logger.info(f"Auto-stopped previous session {old_id}")
         except Exception as stop_err:
             logger.error(f"Failed to auto-stop previous session: {stop_err}")
+            # Force-reset the processor state so the new session can start
+            video_processor.is_active = False
+            video_processor.video_capture = None
+        # Small delay to let the frame loop's finally block finish
+        await asyncio.sleep(0.2)
 
     try:
+        # For uploaded files, resolve the full path
+        source_name = request.source_name
+        if request.source_type == "upload":
+            # source_name is just the filename — resolve to full uploads/ path
+            if not os.path.isabs(source_name) and not source_name.startswith(UPLOAD_DIR):
+                source_name = os.path.join(UPLOAD_DIR, source_name)
+            if not os.path.exists(source_name):
+                logger.error(f"Uploaded file not found: {source_name}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"error": f"Video file not found: {request.source_name}. Upload it first."},
+                )
+            logger.info(f"Resolved upload path: {source_name}")
+
         # Start actual video capture
-        logger.info(f"Starting video processor: {request.source_type}:{request.source_name}")
+        logger.info(f"Starting video processor: {request.source_type}:{source_name}")
         started = await asyncio.get_event_loop().run_in_executor(
             None,
             video_processor.start_session,
             request.source_type,
-            request.source_name
+            source_name,
         )
 
         if not started:
-            logger.error(f"Video processor failed to open source: {request.source_name}")
+            logger.error(f"Video processor failed to open source: {source_name}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": f"Failed to open video source: {request.source_name}"}
+                detail={"error": f"Failed to open video source: {source_name}"},
             )
 
         # Create DB session record
         session_id = session_manager.create_session(
             source_type=request.source_type,
-            source_name=request.source_name
+            source_name=source_name,
         )
 
         started_at = datetime.utcnow().isoformat() + "Z"
-        logger.info(f"Session started: {session_id}, source={request.source_type}:{request.source_name}")
+        logger.info(f"Session started: {session_id}, source={request.source_type}:{source_name}")
 
         # Start background frame processing loop
         asyncio.create_task(_frame_processing_loop(session_id))
@@ -439,7 +446,7 @@ async def start_session(
             session_id=session_id,
             started_at=started_at,
             source_type=request.source_type,
-            source_name=request.source_name
+            source_name=source_name,
         )
 
     except HTTPException:
@@ -457,14 +464,20 @@ async def stop_session(
     session_manager: SessionManager = Depends(get_session_manager)
 ) -> VideoStopResponse:
     logger.info("Stop session request received")
-    
+
     active_session = session_manager.get_active_session()
 
     if not active_session:
-        logger.warning("No active session to stop")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "No active session to stop"}
+        # Already stopped — return 200 so the frontend doesn't show an error.
+        # This handles the race condition where the frontend fires multiple stop requests.
+        logger.info("Stop called but no active session — already stopped, returning 200")
+        video_processor = _get_video_processor()
+        if video_processor and video_processor.is_active:
+            await asyncio.get_event_loop().run_in_executor(None, video_processor.stop_session)
+        return VideoStopResponse(
+            session_id="none",
+            ended_at=datetime.utcnow().isoformat() + "Z",
+            statistics={"total_frames": 0, "total_alerts": 0, "peak_risk_score": 0.0, "average_density": 0.0},
         )
 
     try:
